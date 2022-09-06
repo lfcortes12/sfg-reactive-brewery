@@ -1,5 +1,6 @@
 package guru.springframework.sfgrestbrewery.web.controller;
 
+import guru.springframework.sfgrestbrewery.bootstrap.BeerLoader;
 import guru.springframework.sfgrestbrewery.web.functional.BeerRouterConfig;
 import guru.springframework.sfgrestbrewery.web.model.BeerDto;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
@@ -64,6 +66,46 @@ public class WebClientV2IT {
 
         }, throwable -> {
             countDownLatch.countDown();
+        });
+
+        countDownLatch.await(2000, TimeUnit.MILLISECONDS);
+        assertThat(countDownLatch.getCount()).isEqualTo(0);
+    }
+
+    @Test
+    void getBeerByUpc() throws InterruptedException {
+        CountDownLatch countDownLatch = new CountDownLatch(1);
+        var upc = BeerLoader.BEER_10_UPC;
+        Mono<BeerDto> beerDtoMono = webClient.get().uri(BeerRouterConfig.BEER_UPC_V2_URL + "/" + upc)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(BeerDto.class);
+
+
+        beerDtoMono.subscribe(beerDto -> {
+            assertThat(beerDto).isNotNull();
+            assertThat(beerDto.getUpc()).isEqualTo(upc);
+            countDownLatch.countDown();
+        });
+
+        countDownLatch.await(2000, TimeUnit.MILLISECONDS);
+        assertThat(countDownLatch.getCount()).isEqualTo(0);
+    }
+
+    @Test
+    void getBeerByUpcWhenNotFound() throws InterruptedException {
+        CountDownLatch countDownLatch = new CountDownLatch(1);
+        var upc = "any";
+        Mono<BeerDto> beerDtoMono = webClient.get().uri(BeerRouterConfig.BEER_UPC_V2_URL + "/" + upc)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(BeerDto.class);
+
+        beerDtoMono.subscribe(beerDto -> {}, throwable -> {
+            countDownLatch.countDown();
+            assertThat((WebClientResponseException.NotFound) throwable)
+                    .isNotNull()
+                    .extracting("statusCode").isEqualTo("404 NOT_FOUND");
         });
 
         countDownLatch.await(2000, TimeUnit.MILLISECONDS);
