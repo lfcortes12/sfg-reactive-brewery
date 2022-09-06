@@ -1,27 +1,27 @@
 package guru.springframework.sfgrestbrewery.web.controller;
 
-import guru.springframework.sfgrestbrewery.bootstrap.BeerLoader;
-import guru.springframework.sfgrestbrewery.services.BeerService;
-import guru.springframework.sfgrestbrewery.web.model.BeerDto;
-import guru.springframework.sfgrestbrewery.web.model.BeerPagedList;
+import static org.hamcrest.Matchers.equalTo;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+
+import java.util.Arrays;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+
+import guru.springframework.sfgrestbrewery.bootstrap.BeerLoader;
+import guru.springframework.sfgrestbrewery.services.BeerService;
+import guru.springframework.sfgrestbrewery.web.model.BeerDto;
+import guru.springframework.sfgrestbrewery.web.model.BeerPagedList;
 import reactor.core.publisher.Mono;
-
-import java.util.Arrays;
-import java.util.List;
-
-import static org.hamcrest.Matchers.equalTo;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 
 @SpringBootTest(webEnvironment = WebEnvironment.DEFINED_PORT)
 class BeerControllerTest {
@@ -49,7 +49,7 @@ class BeerControllerTest {
 
         BeerPagedList beerPagedList = new BeerPagedList(beerList, PageRequest.of(1,1), beerList.size());
 
-        given(beerService.listBeers(any(), any(), any(), any())).willReturn(beerPagedList);
+        given(beerService.listBeers(any(), any(), any(), any())).willReturn(Mono.just(beerPagedList));
 
         webTestClient.get()
                 .uri("/api/v1/beer")

@@ -38,7 +38,6 @@ public class WebClientIT {
     @Test
     void getBeerById() throws InterruptedException {
         CountDownLatch countDownLatch = new CountDownLatch(1);
-
         Mono<BeerDto> beerDtoMono = webClient.get().uri("api/v1/beer/1")
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve().bodyToMono(BeerDto.class);

@@ -5,7 +5,11 @@ import java.util.UUID;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
+import org.springframework.data.relational.core.query.Criteria;
+import org.springframework.data.relational.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import guru.springframework.sfgrestbrewery.domain.Beer;
 import guru.springframework.sfgrestbrewery.repositories.BeerRepository;
@@ -26,50 +30,41 @@ import reactor.core.publisher.Mono;
 public class BeerServiceImpl implements BeerService {
     private final BeerRepository beerRepository;
     private final BeerMapper beerMapper;
+    private final  R2dbcEntityTemplate template;
 
     @Cacheable(cacheNames = "beerListCache", condition = "#showInventoryOnHand == false ")
     @Override
-    public BeerPagedList listBeers(String beerName, BeerStyleEnum beerStyle, PageRequest pageRequest, Boolean showInventoryOnHand) {
+    public Mono<BeerPagedList> listBeers(String beerName, BeerStyleEnum beerStyle, PageRequest pageRequest, Boolean showInventoryOnHand) {
 
         BeerPagedList beerPagedList = null;
         Page<Beer> beerPage;
 
-//        if (!StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
-//            //search both
-//            beerPage = beerRepository.findAllByBeerNameAndBeerStyle(beerName, beerStyle, pageRequest);
-//        } else if (!StringUtils.isEmpty(beerName) && StringUtils.isEmpty(beerStyle)) {
-//            //search beer_service name
-//            beerPage = beerRepository.findAllByBeerName(beerName, pageRequest);
-//        } else if (StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
-//            //search beer_service style
-//            beerPage = beerRepository.findAllByBeerStyle(beerStyle, pageRequest);
-//        } else {
-//            beerPage = beerRepository.findAll(pageRequest);
-//        }
-//
-//        if (showInventoryOnHand){
-//            beerPagedList = new BeerPagedList(beerPage
-//                    .getContent()
-//                    .stream()
-//                    .map(beerMapper::beerToBeerDtoWithInventory)
-//                    .collect(Collectors.toList()),
-//                    PageRequest
-//                            .of(beerPage.getPageable().getPageNumber(),
-//                                    beerPage.getPageable().getPageSize()),
-//                    beerPage.getTotalElements());
-//        } else {
-//            beerPagedList = new BeerPagedList(beerPage
-//                    .getContent()
-//                    .stream()
-//                    .map(beerMapper::beerToBeerDto)
-//                    .collect(Collectors.toList()),
-//                    PageRequest
-//                            .of(beerPage.getPageable().getPageNumber(),
-//                                    beerPage.getPageable().getPageSize()),
-//                    beerPage.getTotalElements());
-//        }
+        Query query;
 
-        return beerPagedList;
+        if (!StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
+            //search both
+            query = Query.query(Criteria.where("beerName").is(beerName).and("beerType").is(beerStyle.name()));
+
+            //beerPage = beerRepository.findAllByBeerNameAndBeerStyle(beerName, beerStyle, pageRequest);
+        } else if (!StringUtils.isEmpty(beerName) && StringUtils.isEmpty(beerStyle)) {
+            //search beer_service name
+
+            query = Query.query(Criteria.where("beerName").is(beerName));
+            //beerPage = beerRepository.findAllByBeerName(beerName, pageRequest);
+        } else if (StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
+            //search beer_service style
+            query = Query.query(Criteria.where("beerStyle").is(beerStyle.name()));
+            //beerPage = beerRepository.findAllByBeerStyle(beerStyle, pageRequest);
+        } else {
+            //beerPage = beerRepository.findAll(pageRequest);
+            query = Query.empty();
+        }
+
+        query.with(pageRequest);
+
+        return template.select(Beer.class).matching(query).all().map(beerMapper::beerToBeerDto).collectList().map(beers -> {
+            return new BeerPagedList(beers, PageRequest.of(pageRequest.getPageNumber(), pageRequest.getPageSize()), beers.size());
+        });
     }
 
     @Cacheable(cacheNames = "beerCache", key = "#beerId", condition = "#showInventoryOnHand == false ")
